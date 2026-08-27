@@ -296,11 +296,11 @@ def export(run_id: str):
 app.mount("/", StaticFiles(directory=_static_dir(), html=True), name="static")
 
 
-if __name__ == "__main__":
+def run_server():
+    """启动本地服务:默认 8000,被占用自动回退到备用端口(打印实际地址)。"""
     import os
     import socket
 
-    # 默认端口 8000,若被占用自动回退到备用端口(打印实际使用的端口)
     candidates = [int(os.environ.get("HOTEL_RECON_PORT", "8000")), 8765, 8080, 9000]
     chosen = None
     for p in dict.fromkeys(candidates):
@@ -318,3 +318,7 @@ if __name__ == "__main__":
         print(f"[提示] 端口 {candidates[0]} 被占用,已改用端口 {chosen}")
     print(f"[提示] 请用浏览器打开 http://127.0.0.1:{chosen}")
     uvicorn.run(app, host="127.0.0.1", port=chosen)
+
+
+if __name__ == "__main__":
+    run_server()
