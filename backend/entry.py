@@ -1,4 +1,4 @@
-"""PyInstaller 打包入口(运行方式: python entry.py,或打包后的 hotel-recon.exe)。"""
+"""PyInstaller 打包入口(运行方式: python entry.py,或打包后的 table-diff.exe)。"""
 import sys
 from pathlib import Path
 

@@ -1,6 +1,6 @@
-# 通用对账工具(Recon Tool)
+# 表对比工具(Table Diff)
 
-本地部署的**通用对账工具**:任意两个表格文件(Excel/CSV),配置一个「对账方案」(主键匹配列 + 数据对比列),即可自动按主键配对、逐列对比,输出四类结果:**一致 / 有差异 / 仅左侧有 / 仅右侧有**。
+本地部署的**表对比工具**:任意多个表格文件(Excel/CSV),配置一个「对账方案」(对号列 + 对比列),即可自动按对号列配对、逐列对比,输出四类结果:**一致 / 有差异 / 表一独有 / 对比表独有**。
 
 不绑定行业、不绑定系统——酒店 OTA 账单对 PMS、银行流水对台账、供应商对账单、库存进出库……任何"两张表对一下"的场景都能用。
 
@@ -9,7 +9,7 @@
 ## 直接使用(无需编程)
 
 **方式 A:下载打包好的 exe(推荐,给普通用户)**
-1. 打开本项目的 Releases 页面,下载 `hotel-recon.exe`
+1. 打开本项目的 Releases 页面,下载 `table-diff.exe`
 2. 双击运行,浏览器会自动打开(或手动访问提示的地址)
 3. 按「配置映射 → 对账工具」两步走即可使用
 
@@ -18,8 +18,8 @@
 **方式 B:从源码运行(给开发者)**
 
 ```bat
-git clone https://github.com/<你的用户名>/hotel-recon.git
-cd hotel-recon
+git clone https://github.com/<你的用户名>/table-diff.git
+cd table-diff
 run_dev.bat
 ```
 
@@ -52,7 +52,7 @@ run_dev.bat
 ## 目录结构
 
 ```
-hotel-recon/
+table-diff/
 ├── backend/
 │   ├── app/
 │   │   ├── main.py          # FastAPI 入口(API + 静态页面)
@@ -71,8 +71,8 @@ hotel-recon/
 ## 快速开始(开发)
 
 ```bat
-git clone https://github.com/<你的用户名>/hotel-recon.git
-cd hotel-recon
+git clone https://github.com/<你的用户名>/table-diff.git
+cd table-diff
 run_dev.bat
 ```
 
@@ -84,7 +84,7 @@ pip install -r ..\requirements.txt
 python -m app.main
 ```
 
-打开 http://127.0.0.1:8000(端口被占用会自动换,启动时会打印实际地址;也可 `set HOTEL_RECON_PORT=8765` 指定)
+打开 http://127.0.0.1:8000(端口被占用会自动换,启动时会打印实际地址;也可 `set TABLE_DIFF_PORT=8765` 指定)
 
 ## 使用流程
 

@@ -1,6 +1,6 @@
 """SQLite 持久化:每次对账是一个 run(上传的文件 + 解析结果 + 匹配结果)。
 
-本地文件: backend/app/data/recon.db;上传文件: backend/app/data/uploads/<run_id>/
+本地文件: backend/app/data/table_diff.db;上传文件: backend/app/data/uploads/<run_id>/
 """
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ def _data_dir() -> Path:
 
 
 DATA_DIR = _data_dir()
-DB_PATH = DATA_DIR / "recon.db"
+DB_PATH = DATA_DIR / "table_diff.db"
 UPLOAD_DIR = DATA_DIR / "uploads"
 
 _SCHEMA = """
@@ -310,7 +310,7 @@ def update_mapping(mid: int, name: str, column_map: dict):
         conn.close()
 
 
-# ---------------- 对账方案(通用对账工具) ----------------
+# ---------------- 对账方案(表对比工具) ----------------
 
 def save_plan(name: str, tables: list) -> int:
     """保存对账方案。tables: [{name, key, has_header, comparisons}] 表一为主表。"""

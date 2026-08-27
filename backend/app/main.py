@@ -1,4 +1,4 @@
-"""FastAPI 入口:本地部署,单机使用。通用多表对账工具(映射/方案驱动,列按 Excel 位置)。
+"""FastAPI 入口:本地部署,单机使用。表对比工具(映射/方案驱动,列按 Excel 位置)。
 
 启动: python -m app.main  ->  http://127.0.0.1:8000(被占用自动换端口)
 API:
@@ -50,12 +50,12 @@ async def lifespan(_: FastAPI):
     yield
 
 
-app = FastAPI(title="通用多表对账工具", version="0.5.0", lifespan=lifespan)
+app = FastAPI(title="表对比工具", version="0.6.0", lifespan=lifespan)
 
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "app": "recon-tool", "version": "0.5.0"}
+    return {"status": "ok", "app": "table-diff", "version": "0.6.0"}
 
 
 def _to_bool(v) -> int:
@@ -288,7 +288,7 @@ def export(run_id: str):
     return Response(
         content=data,
         media_type="text/csv; charset=utf-8",
-        headers={"Content-Disposition": f'attachment; filename="recon_{run_id}.csv"'},
+        headers={"Content-Disposition": f'attachment; filename="table_diff_{run_id}.csv"'},
     )
 
 
@@ -301,7 +301,7 @@ def run_server():
     import os
     import socket
 
-    candidates = [int(os.environ.get("HOTEL_RECON_PORT", "8000")), 8765, 8080, 9000]
+    candidates = [int(os.environ.get("TABLE_DIFF_PORT", "8000")), 8765, 8080, 9000]
     chosen = None
     for p in dict.fromkeys(candidates):
         try:

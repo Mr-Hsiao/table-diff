@@ -1,4 +1,4 @@
-"""API 端到端测试(通用多表对账工具,表一/表二... + Excel 列位置)。"""
+"""API 端到端测试(表对比工具,表一/表二... + Excel 列位置)。"""
 import csv
 import json
 import sys
@@ -32,7 +32,7 @@ def test_static_page():
     with TestClient(app) as client:
         r = client.get("/")
         assert r.status_code == 200
-        assert "对账" in r.text
+        assert "表对比" in r.text
         for asset in ("/style.css", "/app.js", "/vendor/vue.global.prod.js"):
             ar = client.get(asset)
             assert ar.status_code == 200, f"{asset} -> {ar.status_code}"

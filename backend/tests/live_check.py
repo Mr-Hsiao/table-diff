@@ -1,4 +1,4 @@
-"""对真实运行中服务(通用多表对账工具)的完整流程验证。"""
+"""对真实运行中服务(表对比工具)的完整流程验证。"""
 import json
 import sys
 from pathlib import Path
