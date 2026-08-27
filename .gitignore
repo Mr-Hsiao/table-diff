@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# 数据与上传文件(不提交)
+backend/app/data/
+
+# 构建产物
+build/
+dist/
+*.spec
+
+# 编辑器
+.idea/
+.vscode/
+*.swp

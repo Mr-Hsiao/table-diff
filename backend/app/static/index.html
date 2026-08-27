@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>通用多表对账工具</title>
+<link rel="stylesheet" href="/style.css?v=0.52">
+</head>
+<body>
+<div id="app" v-cloak>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">
+        <svg viewBox="0 0 32 32" width="28" height="28">
+          <rect x="4" y="6" width="24" height="20" rx="3" fill="currentColor" opacity=".16"/>
+          <rect x="4" y="6" width="24" height="20" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/>
+          <path d="M4 13h24M13 6v20" stroke="currentColor" stroke-width="1.8"/>
+        </svg>
+      </span>
+      <div class="brand-text">
+        <h1>通用多表对账</h1>
+        <p>两张表对一下 · 数据不出本机</p>
+      </div>
+    </div>
+    <nav>
+      <button :class="{ active: view === 'recon' }" @click="switchView('recon')">
+        <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M3 4.5A1.5 1.5 0 0 1 4.5 3h11A1.5 1.5 0 0 1 17 4.5v11a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 3 15.5v-11ZM5 7h10V5.5a.5.5 0 0 0-.5-.5h-9a.5.5 0 0 0-.5.5V7Zm0 2v6.5a.5.5 0 0 0 .5.5h9a.5.5 0 0 0 .5-.5V9H5Z"/></svg>
+        对账工具
+      </button>
+      <button :class="{ active: view === 'plans' }" @click="switchView('plans')">
+        <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M4 3.5A1.5 1.5 0 0 1 5.5 2h9A1.5 1.5 0 0 1 16 3.5V17l-6-2.2L4 17V3.5Z"/></svg>
+        配置映射
+      </button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- ============ 对账工具 ============ -->
+    <template v-if="view === 'recon'">
+      <section class="card" v-if="reconStep === 'setup'">
+        <div class="card-head">
+          <div>
+            <p class="eyebrow">每日对账</p>
+            <h2>选择映射并上传文件</h2>
+          </div>
+          <span class="chip" v-if="selectedPlan">{{ reconReadyCount }}/{{ reconTables.length }} 份已就绪</span>
+        </div>
+
+        <div class="empty-hero" v-if="!plans.length">
+          <div class="empty-icon">
+            <svg viewBox="0 0 48 48" width="40" height="40"><path fill="currentColor" d="M10 8h28a2 2 0 0 1 2 2v28a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2V10a2 2 0 0 1 2-2zm4 8v2h20v-2H14zm0 8v2h14v-2H14zm0 8v2h18v-2H14z"/></svg>
+          </div>
+          <h3>还没有对账映射</h3>
+          <p>先配置一次「对哪几列、怎么对号」，之后每天只需上传文件即可。</p>
+          <button class="primary" @click="switchView('plans')">去配置映射</button>
+        </div>
+
+        <template v-else>
+          <div class="side-block plan-pick">
+            <div class="form-stack">
+              <label>选择映射</label>
+              <select v-model="planSel">
+                <option value="">— 选择一个已保存的映射 —</option>
+                <option v-for="p in plans" :key="p.id" :value="String(p.id)">{{ p.name }}</option>
+              </select>
+            </div>
+            <div class="plan-info" v-if="selectedPlan">
+              <span class="plan-info-kicker">对比关系</span>
+              以 <b>{{ selectedPlan.tables[0].name }}</b> 为基准，与
+              <template v-for="(t, ti) in selectedPlan.tables" :key="ti">
+                <b v-if="ti > 0">{{ t.name }}</b><template v-if="ti > 0 && ti < selectedPlan.tables.length - 1">、</template>
+              </template>
+              核对 {{ selectedPlan.tables.slice(1).reduce((n, t) => n + t.comparisons.length, 0) }} 个列
+            </div>
+          </div>
+
+          <div class="upload-grid" v-if="selectedPlan">
+            <div class="side-block upload-card" v-for="(t, ti) in reconTables" :key="ti"
+                 :class="{ ready: !!reconFiles[ti] }">
+              <div class="upload-card-head">
+                <span class="badge">表{{ cn(ti) }}</span>
+                <div>
+                  <h3>{{ t.name }}</h3>
+                  <p class="muted">对号列：第 {{ t.key }} 列</p>
+                </div>
+              </div>
+              <div class="dropzone"
+                   :class="{ ready: !!reconFiles[ti], over: dragOver === 'r' + ti }"
+                   @click="pickReconFile(ti)"
+                   @dragover.prevent="onDragOver('r' + ti)"
+                   @dragleave="onDragLeave"
+                   @drop.prevent="dropReconFile(ti, $event)">
+                <template v-if="reconFiles[ti]">
+                  <span class="dz-mark ok" aria-hidden="true">
+                    <svg viewBox="0 0 20 20" width="18" height="18"><path fill="currentColor" d="M8.2 13.4 4.8 10l1.4-1.4 2 2 5.6-5.6L15.2 6z"/></svg>
+                  </span>
+                  <div class="dz-meta">
+                    <strong>{{ reconFiles[ti].name }}</strong>
+                    <span>{{ fmtSize(reconFiles[ti].size) }} · 点击可更换</span>
+                  </div>
+                  <button type="button" class="ghost" @click.stop="clearReconFile(ti)">清除</button>
+                </template>
+                <template v-else>
+                  <span class="dz-mark" aria-hidden="true">
+                    <svg viewBox="0 0 20 20" width="18" height="18"><path fill="currentColor" d="M10 3.5 5.5 8H8v5h4V8h2.5L10 3.5ZM4 16h12v1.5H4V16Z"/></svg>
+                  </span>
+                  <div class="dz-meta">
+                    <strong>拖入文件，或点击选择</strong>
+                    <span>支持 Excel / CSV</span>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </div>
+
+          <div class="empty-inline" v-else>
+            请先在上方选择一个映射，再按表名上传对应文件。
+          </div>
+
+          <div class="actions sticky-actions">
+            <button class="primary lg" :disabled="busy || !canRecon" @click="runRecon">
+              {{ busy ? '正在对账…' : '开始对账' }}
+            </button>
+            <span class="hint-inline" v-if="selectedPlan && !canRecon">请为每张表都上传文件后再开始</span>
+          </div>
+        </template>
+      </section>
+
+      <section class="card result-card" v-if="reconStep === 'result'">
+        <div class="card-head">
+          <div>
+            <p class="eyebrow">对账完成</p>
+            <h2>{{ resultInfo.plan_name || '对账结果' }}</h2>
+          </div>
+          <div class="head-actions">
+            <button class="primary" @click="exportCsv">导出差异报表</button>
+            <button @click="resetRecon">重新对账</button>
+          </div>
+        </div>
+
+        <div class="stats">
+          <button class="stat ok" :class="{ active: activeTab === 'matched' }" @click="activeTab = 'matched'">
+            <b>{{ stats.matched }}</b><span>一致</span>
+          </button>
+          <button class="stat diff" :class="{ active: activeTab === 'diff' }" @click="activeTab = 'diff'">
+            <b>{{ stats.diff }}</b><span>有差异</span>
+          </button>
+          <button class="stat warn" :class="{ active: activeTab === 'master_only' }" @click="activeTab = 'master_only'">
+            <b>{{ stats.master_only }}</b><span>{{ masterName }}独有</span>
+          </button>
+          <button class="stat warn" :class="{ active: activeTab === 'table_only' }" @click="activeTab = 'table_only'">
+            <b>{{ stats.table_only }}</b><span>{{ satName }}独有</span>
+          </button>
+        </div>
+
+        <div class="result-toolbar">
+          <div class="tabs">
+            <button v-for="t in tabs" :key="t.key"
+                    :class="{ active: activeTab === t.key }" @click="activeTab = t.key">
+              {{ t.label }} <span class="cnt">{{ itemsOf(t.key).length }}</span>
+            </button>
+          </div>
+          <div class="search">
+            <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M8.5 3a5.5 5.5 0 0 1 4.4 8.8l3.7 3.6-1.4 1.4-3.6-3.7A5.5 5.5 0 1 1 8.5 3Zm0 1.5a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z"/></svg>
+            <input v-model="resultQuery" type="search" placeholder="筛选主键或说明…">
+          </div>
+        </div>
+
+        <div class="result-group" v-for="g in resultGroups" :key="g.table">
+          <h3>与「{{ g.table }}」对比 <span class="muted">{{ g.rows.length }} 条</span></h3>
+          <div class="table-wrap" v-if="g.rows.length">
+            <table>
+              <thead>
+                <tr>
+                  <th>主键</th>
+                  <template v-for="(c, ci) in g.cols" :key="ci">
+                    <th>{{ masterName }} · {{ c.left }}</th>
+                    <th>{{ g.table }} · {{ c.right }}</th>
+                  </template>
+                  <th>说明</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(row, ri) in g.rows" :key="ri">
+                  <td class="key-cell">{{ row.key }}</td>
+                  <template v-for="(c, ci) in g.cols" :key="ci">
+                    <td class="val">{{ row.cols[ci].left_val }}</td>
+                    <td class="val" :class="{ bad: !row.cols[ci].equal && row.kind === 'diff' }">
+                      {{ row.cols[ci].right_val }}
+                    </td>
+                  </template>
+                  <td class="notes">{{ row.note }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <p v-if="!resultGroups.length" class="empty">
+          {{ resultQuery.trim() ? '没有匹配当前筛选的记录' : '该分类暂无记录' }}
+        </p>
+
+        <div class="stats-footer" v-if="stats">
+          <div class="stats-line">
+            统计：一致 <b>{{ stats.matched }}</b> 条 · 有差异 <b>{{ stats.diff }}</b> 条 ·
+            {{ masterName }}独有 <b>{{ stats.master_only }}</b> 条 ·
+            {{ satName }}独有 <b>{{ stats.table_only }}</b> 条 ·
+            差异合计 <b class="bad">{{ fmtVal(stats.diff_amount) }}</b>
+          </div>
+          <div class="col-stats" v-if="colStats.length">
+            <div class="col-stats-title">列差异统计</div>
+            <div class="col-stats-grid">
+              <div v-for="cs in colStats" :key="cs.table + cs.left + cs.right" class="col-stats-row">
+                <span>【{{ cs.table }}】{{ cs.left }} ↔ {{ cs.right }}</span>
+                <span>差异 <b>{{ cs.count }}</b> 条，合计 <b class="bad">{{ fmtVal(cs.amount) }}</b></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </template>
+
+    <!-- ============ 配置映射 ============ -->
+    <template v-if="view === 'plans'">
+      <section class="card">
+        <div class="card-head">
+          <div>
+            <p class="eyebrow">{{ editorMode === 'edit' ? '编辑映射' : '新建映射' }}</p>
+            <h2>{{ editorMode === 'edit' ? editorName || '编辑映射' : '配置映射' }}</h2>
+          </div>
+        </div>
+
+        <ol class="guide">
+          <li class="guide-step"><b>1</b> 给这次对账起名字</li>
+          <li class="guide-step"><b>2</b> 加入至少两张表：起名、上传样例、选对号列</li>
+          <li class="guide-step"><b>3</b> 表二及以后，选出要核对一致的列</li>
+          <li class="guide-step"><b>4</b> 保存后，到「对账工具」上传文件即可对</li>
+        </ol>
+
+        <p class="map-tip">
+          例如把「携程账单」和「PMS 流水」对账：两边都选「订单号」当对号列，再核对结算金额、佣金是否一致。
+        </p>
+
+        <div class="form-stack name-row">
+          <label>对账名称</label>
+          <input class="name-input" v-model="editorName" placeholder="如：OTA对账 / 银行流水对台账">
+          <span class="hint">以后在「对账工具」的下拉框里选它</span>
+        </div>
+
+        <div class="side-block table-editor" v-for="(t, ti) in editorTables" :key="ti">
+          <div class="table-editor-head">
+            <span class="badge">表{{ cn(ti) }}</span>
+            <h3>{{ t.name || '未命名' }}</h3>
+            <button v-if="ti > 0 && editorTables.length > 2" class="danger small" @click="removeTable(ti)">删除本表</button>
+          </div>
+
+          <div class="form-grid">
+            <div class="form-stack">
+              <label>这张表是什么？</label>
+              <input class="tbl-name" v-model="t.name" placeholder="如：携程账单 / PMS流水">
+            </div>
+            <div class="form-stack">
+              <label>对号列（匹配列）</label>
+              <select v-model="t.key" :disabled="!t.labels.length">
+                <option value="">{{ t.labels.length ? '— 选一列 —' : '请先上传样例' }}</option>
+                <option v-for="lab in t.labels" :key="lab" :value="letterOf(lab)">{{ lab }}</option>
+              </select>
+              <span class="hint">两张表靠这一列对上号，例如都有「订单号」</span>
+            </div>
+          </div>
+
+          <div class="form-stack">
+            <label>上传样例文件</label>
+            <div class="dropzone sm"
+                 :class="{ ready: !!t.fileName, over: dragOver === 'e' + ti }"
+                 @click="pickEditorFile(ti)"
+                 @dragover.prevent="onDragOver('e' + ti)"
+                 @dragleave="onDragLeave"
+                 @drop.prevent="dropEditorFile(ti, $event)">
+              <template v-if="t.fileName">
+                <span class="dz-mark ok">
+                  <svg viewBox="0 0 20 20" width="16" height="16"><path fill="currentColor" d="M8.2 13.4 4.8 10l1.4-1.4 2 2 5.6-5.6L15.2 6z"/></svg>
+                </span>
+                <div class="dz-meta">
+                  <strong>{{ t.fileName }}</strong>
+                  <span v-if="t.labels.length">已识别 {{ t.labels.length }} 列 · 点击可更换</span>
+                  <span v-else>点击可更换</span>
+                </div>
+              </template>
+              <template v-else>
+                <span class="dz-mark">
+                  <svg viewBox="0 0 20 20" width="16" height="16"><path fill="currentColor" d="M10 3.5 5.5 8H8v5h4V8h2.5L10 3.5ZM4 16h12v1.5H4V16Z"/></svg>
+                </span>
+                <div class="dz-meta">
+                  <strong>拖入样例，或点击选择</strong>
+                  <span>程序会列出 A:订单号、B:金额，方便选列</span>
+                </div>
+              </template>
+            </div>
+            <label class="check">
+              <input type="checkbox" v-model="t.has_header"> 第一行是列名（表头）
+            </label>
+          </div>
+
+          <p class="callout" v-if="editorMode === 'edit' && !t.labels.length">
+            编辑已有映射时，请重新上传样例文件，才能从下拉框里选择列。
+          </p>
+
+          <template v-if="ti > 0">
+            <h4 class="cmp-title">要核对一致的列</h4>
+            <p class="hint">检查「{{ t.name || '本表' }}」和「{{ editorTables[0].name || '表一' }}」这些列是否一样。数字列可设容差（0.01 = 差 1 分钱以内算一致）。</p>
+            <div class="table-wrap">
+              <table class="map-table">
+                <thead>
+                  <tr>
+                    <th>{{ editorTables[0].name || '表一' }} 的列</th>
+                    <th></th>
+                    <th>{{ t.name || '本表' }} 的列</th>
+                    <th>容差</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(c, ci) in t.comparisons" :key="ci">
+                    <td>
+                      <select v-model="c.left">
+                        <option value="">选择列</option>
+                        <option v-for="lab in editorTables[0].labels" :key="lab" :value="letterOf(lab)">{{ lab }}</option>
+                      </select>
+                    </td>
+                    <td class="arrow">→</td>
+                    <td>
+                      <select v-model="c.right">
+                        <option value="">选择列</option>
+                        <option v-for="lab in t.labels" :key="lab" :value="letterOf(lab)">{{ lab }}</option>
+                      </select>
+                    </td>
+                    <td><input class="tol" v-model="c.tolerance" placeholder="0.01"></td>
+                    <td class="ops"><button class="danger small" @click="t.comparisons.splice(ci, 1)">删除</button></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <button class="ghost-add" @click="t.comparisons.push({ left: '', right: '', tolerance: '0.01' })">+ 添加要核对的列</button>
+          </template>
+        </div>
+
+        <button v-if="editorTables.length < 6" class="ghost-add dashed" @click="addTable">
+          + 添加表（表{{ cn(editorTables.length) }}）
+        </button>
+
+        <div class="actions sticky-actions">
+          <button class="primary lg" :disabled="!editorName.trim() || !tablesReady" @click="savePlan">
+            {{ editorMode === 'edit' ? '更新映射' : '保存映射' }}
+          </button>
+          <button v-if="editorMode === 'edit'" @click="resetEditor">取消编辑</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <div>
+            <p class="eyebrow">已保存</p>
+            <h2>已有映射</h2>
+          </div>
+          <span class="chip muted-chip" v-if="plans.length">{{ plans.length }} 套</span>
+        </div>
+        <div class="plan-list" v-if="plans.length">
+          <article class="plan-item" v-for="p in plans" :key="p.id">
+            <div class="plan-item-body">
+              <h3>{{ p.name }}</h3>
+              <p class="muted">
+                以【{{ (p.tables || [])[0].name }}】为基准，与
+                {{ (p.tables || []).slice(1).map(t => '【' + t.name + '】').join('、') }} 对比
+              </p>
+            </div>
+            <div class="ops">
+              <button @click="editPlan(p)">编辑</button>
+              <button class="danger" @click="deletePlan(p.id)">删除</button>
+            </div>
+          </article>
+        </div>
+        <p v-else class="empty">暂无映射，先在上方配置一个</p>
+      </section>
+    </template>
+  </main>
+
+  <footer>通用多表对账工具 v0.5 · 支持表一～表六 · 数据仅保存在本机</footer>
+
+  <div class="overlay" v-if="busy">
+    <div class="spinner" aria-hidden="true"></div>
+    <p>正在对账，请稍候…</p>
+  </div>
+
+  <div class="toast" :class="[toast.type, { show: toast.show }]" role="status">{{ toast.msg }}</div>
+
+  <div class="modal-backdrop" v-if="dialog.show" @click.self="closeDialog(false)">
+    <div class="modal" role="dialog" aria-modal="true">
+      <h3>{{ dialog.title }}</h3>
+      <p>{{ dialog.msg }}</p>
+      <div class="actions">
+        <button @click="closeDialog(false)">取消</button>
+        <button :class="dialog.danger ? 'danger-fill' : 'primary'" @click="closeDialog(true)">{{ dialog.okText }}</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/vendor/vue.global.prod.js"></script>
+<script src="/app.js?v=0.52"></script>
+</body>
+</html>
