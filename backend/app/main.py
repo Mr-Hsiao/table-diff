@@ -325,11 +325,12 @@ def run_server():
     if host == "0.0.0.0":
         # 服务器模式安全防线:必须设置访问口令,否则拒绝启动
         if not os.environ.get("TABLE_DIFF_TOKEN", ""):
-            print("[错误] 服务器模式必须设置访问口令(TABLE_DIFF_TOKEN)。\n"
-                  "       生成命令: openssl rand -hex 16\n"
-                  "       这是防止公网任何人操作你的服务的必要配置。")
+            _p("[错误] 服务器模式必须设置访问口令(TABLE_DIFF_TOKEN)。\n"
+               "       生成命令: openssl rand -hex 16\n"
+               "       这是防止公网任何人操作你的服务的必要配置。")
             raise SystemExit(1)
-        print(f"[提示] 服务已启动 http://0.0.0.0:{port}(公网访问请配置反向代理与 HTTPS)")
+        _p(f"[提示] 服务已启动 http://0.0.0.0:{port}(公网访问请配置反向代理与 HTTPS)")
+        _write_state(port)
         uvicorn.run(app, host="0.0.0.0", port=port)
         return
 
@@ -344,12 +345,38 @@ def run_server():
         except OSError:
             continue
     if chosen is None:
-        print("[错误] 没有可用端口,请设置环境变量 TABLE_DIFF_PORT 指定端口")
+        _p("[错误] 没有可用端口,请设置环境变量 TABLE_DIFF_PORT 指定端口")
         raise SystemExit(1)
     if chosen != candidates[0]:
-        print(f"[提示] 端口 {candidates[0]} 被占用,已改用端口 {chosen}")
-    print(f"[提示] 请用浏览器打开 http://127.0.0.1:{chosen}")
+        _p(f"[提示] 端口 {candidates[0]} 被占用,已改用端口 {chosen}")
+    _p(f"[提示] 请用浏览器打开 http://127.0.0.1:{chosen}")
+    _write_state(chosen)
     uvicorn.run(app, host="127.0.0.1", port=chosen)
+
+
+def _p(*args):
+    """打印(兼容打包后无控制台窗口的环境,stdout 可能为 None)。"""
+    try:
+        print(*args)
+    except Exception:
+        pass
+
+
+def _write_state(port: int):
+    """把实际使用的端口写入 data/server.json,供启动器(双击 exe)识别服务地址。"""
+    import datetime
+    try:
+        st = {
+            "port": port,
+            "pid": os.getpid(),
+            "started_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "url": f"http://127.0.0.1:{port}",
+        }
+        db.DATA_DIR.mkdir(parents=True, exist_ok=True)
+        (db.DATA_DIR / "server.json").write_text(
+            json.dumps(st, ensure_ascii=False), encoding="utf-8")
+    except Exception:
+        pass
 
 
 if __name__ == "__main__":
