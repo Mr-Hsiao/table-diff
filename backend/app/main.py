@@ -43,20 +43,21 @@ def _static_dir() -> Path:
     """前端静态目录。
 
     - 开发:直接使用源码 app/static
-    - 打包后:首次启动把内置静态复制到 exe 同目录的 static(持久化目录),
-      避免从临时解压目录服务被杀软/云同步干扰;且改二维码/页面无需重新打包。
-      复制失败时退回内置目录。
+    - 打包后:首次启动把内置静态(含子目录 vendor/ 等)整体复制到 exe 同目录的
+      static(持久化目录),避免从临时解压目录服务被杀软/云同步干扰;
+      已存在的文件不覆盖(可自行改二维码/页面,无需重新打包)。失败时退回内置目录。
     """
     if getattr(sys, "frozen", False):
         bundle = Path(sys._MEIPASS) / "app" / "static"
         persistent = Path(sys.executable).resolve().parent / "static"
         try:
             persistent.mkdir(parents=True, exist_ok=True)
-            for item in bundle.iterdir():
-                if item.is_file():
-                    target = persistent / item.name
+            for src in bundle.rglob("*"):
+                if src.is_file():
+                    target = persistent / src.relative_to(bundle)
                     if not target.exists():
-                        shutil.copy2(item, target)
+                        target.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.copy2(src, target)
             return persistent
         except Exception:
             return bundle

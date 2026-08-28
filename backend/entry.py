@@ -3,7 +3,8 @@
 用法:
   双击 exe / python entry.py        守护模式(Windows 桌面):
       服务未运行 -> 后台静默启动 + 自动打开浏览器
-      服务已在运行 -> 直接打开浏览器(不重复启动)
+      服务已运行且版本一致 -> 直接打开浏览器(不重复启动)
+      服务已运行但版本不同(旧版残留)-> 杀掉旧服务,重新拉起当前版本
   python entry.py --server          后台服务模式(由守护模式拉起,或手动前台运行)
   python entry.py --stop            停止后台服务(读取 data/server.json)
   容器 / Linux                      直接前台运行服务(TABLE_DIFF_HOST=0.0.0.0)
@@ -127,14 +128,45 @@ def stop_mode():
         _msg("表对比工具", "停止服务失败,请在任务管理器中结束 table-diff 进程。")
 
 
-def launcher_mode():
-    """守护模式:服务未启动则后台拉起并自动打开浏览器;已启动则只打开浏览器。"""
-    port, running = _running()
-    if running:
-        _open_browser(port)
-        return
+def _health_version(port: int) -> str:
+    """读取运行中服务的版本号(用于判断是否旧版残留)。"""
+    try:
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/health", timeout=2) as r:
+            data = json.loads(r.read().decode("utf-8", "ignore"))
+            return str(data.get("version", ""))
+    except Exception:
+        return ""
 
-    # 拉起后台服务(隐藏窗口)
+
+def _current_version() -> str:
+    try:
+        from app.main import app
+        return str(getattr(app, "version", ""))
+    except Exception:
+        return ""
+
+
+def _kill_pid(pid: int) -> bool:
+    import signal
+    for sig in (signal.SIGTERM, signal.SIGKILL):
+        try:
+            os.kill(pid, sig)
+            return True
+        except Exception:
+            continue
+    if os.name == "nt":
+        try:
+            subprocess.run(["taskkill", "/F", "/PID", str(pid)],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                           timeout=10)
+            return True
+        except Exception:
+            pass
+    return False
+
+
+def _start_and_open():
+    """后台拉起服务,等待就绪后打开浏览器。"""
     try:
         if _frozen():
             cmd = [sys.executable, SERVER_FLAG]
@@ -145,8 +177,6 @@ def launcher_mode():
     except Exception as e:
         _msg("表对比工具", f"服务启动失败: {e}")
         return
-
-    # 等待服务就绪(最多 20 秒),然后打开浏览器
     for _ in range(40):
         time.sleep(0.5)
         port, running = _running()
@@ -154,6 +184,29 @@ def launcher_mode():
             _open_browser(port)
             return
     _msg("表对比工具", "服务启动超时,请查看 data/server.log 排查。")
+
+
+def launcher_mode():
+    """守护模式:
+    - 服务未运行           -> 后台拉起 + 自动打开浏览器
+    - 服务已运行且版本一致 -> 直接打开浏览器(不重复启动)
+    - 服务已运行但版本不同 -> 杀掉旧服务,重新拉起当前版本(避免旧版残留问题)
+    """
+    port, running = _running()
+    if running and _health_version(port) == _current_version():
+        _open_browser(port)
+        return
+    if running:
+        # 旧版残留:先杀掉,等端口释放,再启动新版
+        st = _read_state()
+        if st and st.get("pid"):
+            _kill_pid(int(st["pid"]))
+        try:
+            _state_file().unlink(missing_ok=True)
+        except Exception:
+            pass
+        time.sleep(1.0)
+    _start_and_open()
 
 
 def main():
