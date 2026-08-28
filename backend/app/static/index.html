@@ -384,7 +384,20 @@
     </template>
   </main>
 
-  <footer>表对比工具 v0.6 · 支持表一～表六 · 数据仅保存在本机</footer>
+  <footer>
+    <div class="promo">
+      <div class="promo-text">
+        <b>关注公众号</b>
+        <span>使用教程 · 更新通知 · 对账模板免费下载</span>
+      </div>
+      <img v-if="!qrMissing" src="/qrcode.png" alt="公众号二维码" class="promo-qr"
+           @error="qrMissing = true" />
+      <div v-else class="promo-qr promo-qr-missing">
+        公众号二维码<br><span>请将二维码图片保存为<br>static/qrcode.png 后重新打包</span>
+      </div>
+    </div>
+    <div class="footer-line">表对比工具 v0.6 · 支持表一～表六 · 数据仅保存在本机</div>
+  </footer>
 
   <div class="overlay" v-if="busy">
     <div class="spinner" aria-hidden="true"></div>
@@ -406,6 +419,6 @@
 </div>
 
 <script src="/vendor/vue.global.prod.js"></script>
-<script src="/app.js?v=0.52"></script>
+<script src="/app.js?v=0.53"></script>
 </body>
 </html>

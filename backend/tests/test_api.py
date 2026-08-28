@@ -33,7 +33,7 @@ def test_static_page():
         r = client.get("/")
         assert r.status_code == 200
         assert "表对比" in r.text
-        for asset in ("/style.css", "/app.js", "/vendor/vue.global.prod.js"):
+        for asset in ("/style.css", "/app.js", "/vendor/vue.global.prod.js", "/qrcode.png"):
             ar = client.get(asset)
             assert ar.status_code == 200, f"{asset} -> {ar.status_code}"
     print("static page OK")
