@@ -390,8 +390,8 @@
         <b>关注公众号</b>
         <span>使用教程 · 更新通知 · 对账模板免费下载</span>
       </div>
-      <img v-if="!qrMissing" src="/qrcode.png" alt="公众号二维码" class="promo-qr"
-           @error="qrMissing = true" />
+      <img v-if="!qrMissing" :src="qrSrc" alt="公众号二维码" class="promo-qr"
+           @error="qrError" />
       <div v-else class="promo-qr promo-qr-missing">
         公众号二维码<br><span>请将二维码图片保存为<br>static/qrcode.png 后重新打包</span>
       </div>
@@ -419,6 +419,6 @@
 </div>
 
 <script src="/vendor/vue.global.prod.js"></script>
-<script src="/app.js?v=0.53"></script>
+<script src="/app.js?v=0.54"></script>
 </body>
 </html>

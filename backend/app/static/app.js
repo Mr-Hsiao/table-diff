@@ -65,6 +65,11 @@ createApp({
     const dialog = reactive({ show: false, title: '', msg: '', okText: '确定', danger: false });
     let dialogResolve = null;
     const qrMissing = ref(false);
+    const qrSrc = ref('/qrcode.jpg');
+    function qrError() {
+      if (qrSrc.value === '/qrcode.jpg') { qrSrc.value = '/qrcode.png'; return; }
+      qrMissing.value = true;
+    }
 
     const selectedPlan = computed(() =>
       plans.value.find(p => String(p.id) === planSel.value) || null);
@@ -417,7 +422,7 @@ createApp({
       editorMode, editorId, editorName, editorTables, tablesReady, letterOf,
       addTable, removeTable, onTableFile, pickEditorFile, dropEditorFile,
       savePlan, editPlan, deletePlan, resetEditor,
-      toast, dialog, closeDialog, qrMissing,
+      toast, dialog, closeDialog, qrMissing, qrSrc, qrError,
     };
   },
 }).mount('#app');
