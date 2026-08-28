@@ -40,8 +40,26 @@ MAX_TABLES = 6
 
 
 def _static_dir() -> Path:
-    if getattr(sys, "frozen", False):  # PyInstaller 打包后
-        return Path(sys._MEIPASS) / "app" / "static"
+    """前端静态目录。
+
+    - 开发:直接使用源码 app/static
+    - 打包后:首次启动把内置静态复制到 exe 同目录的 static(持久化目录),
+      避免从临时解压目录服务被杀软/云同步干扰;且改二维码/页面无需重新打包。
+      复制失败时退回内置目录。
+    """
+    if getattr(sys, "frozen", False):
+        bundle = Path(sys._MEIPASS) / "app" / "static"
+        persistent = Path(sys.executable).resolve().parent / "static"
+        try:
+            persistent.mkdir(parents=True, exist_ok=True)
+            for item in bundle.iterdir():
+                if item.is_file():
+                    target = persistent / item.name
+                    if not target.exists():
+                        shutil.copy2(item, target)
+            return persistent
+        except Exception:
+            return bundle
     return BASE_DIR / "static"
 
 
