@@ -2,6 +2,39 @@ const { createApp, ref, reactive, computed } = Vue;
 
 const FILE_OK = /\.(xlsx|xls|csv)$/i;
 
+// ---- 访问口令(公网部署时后端配置 TABLE_DIFF_TOKEN 后启用) ----
+const TOKEN_KEY = 'td_token';
+
+function getToken() {
+  try { return localStorage.getItem(TOKEN_KEY) || ''; } catch (e) { return ''; }
+}
+function setToken(t) {
+  try { localStorage.setItem(TOKEN_KEY, t); } catch (e) {}
+}
+
+async function apiFetch(url, opts) {
+  opts = opts || {};
+  opts.headers = Object.assign({}, opts.headers);
+  const t = getToken();
+  if (t) opts.headers['X-Token'] = t;
+  let r = await fetch(url, opts);
+  if (r.status === 401) {
+    const input = window.prompt('此服务需要访问口令才能使用,请输入(向管理员获取):');
+    if (input && input.trim()) {
+      setToken(input.trim());
+      opts.headers['X-Token'] = input.trim();
+      r = await fetch(url, opts);
+      if (r.status === 401) window.alert('口令不正确,请重试');
+    }
+  }
+  return r;
+}
+
+function exportUrl(path) {
+  const t = getToken();
+  return t ? (path + (path.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(t)) : path;
+}
+
 createApp({
   setup() {
     const view = ref('recon');
@@ -169,7 +202,7 @@ createApp({
     function onDragLeave() { dragOver.value = ''; }
 
     async function loadPlans() {
-      const r = await fetch('/api/plans');
+      const r = await apiFetch('/api/plans');
       const d = await r.json();
       plans.value = d.plans || [];
     }
@@ -214,7 +247,7 @@ createApp({
       });
       busy.value = true;
       try {
-        const r = await fetch('/api/recon', { method: 'POST', body: fd });
+        const r = await apiFetch('/api/recon', { method: 'POST', body: fd });
         const d = await r.json();
         if (!r.ok) throw new Error(d.detail || '对账失败');
         runId.value = d.run_id;
@@ -235,7 +268,7 @@ createApp({
     }
 
     function exportCsv() {
-      if (runId.value) window.location.href = '/api/export/' + runId.value;
+      if (runId.value) window.location.href = exportUrl('/api/export/' + runId.value);
     }
 
     function resetRecon() {
@@ -285,7 +318,7 @@ createApp({
       fd.append('file', file);
       fd.append('has_header', t.has_header ? '1' : '0');
       try {
-        const r = await fetch('/api/preview', { method: 'POST', body: fd });
+        const r = await apiFetch('/api/preview', { method: 'POST', body: fd });
         const d = await r.json();
         if (!r.ok) throw new Error(d.detail || '预览失败');
         t.fileName = file.name;
@@ -346,7 +379,7 @@ createApp({
       fd.append('tables', JSON.stringify(tables));
       const url = editorMode.value === 'edit' ? '/api/plans/' + editorId.value : '/api/plans';
       try {
-        const r = await fetch(url, { method: editorMode.value === 'edit' ? 'PUT' : 'POST', body: fd });
+        const r = await apiFetch(url, { method: editorMode.value === 'edit' ? 'PUT' : 'POST', body: fd });
         const d = await r.json();
         if (!r.ok) throw new Error(d.detail || '保存失败');
         await loadPlans();
@@ -360,7 +393,7 @@ createApp({
     async function deletePlan(id) {
       const ok = await ask('删除映射', '确定删除该映射？此操作不可撤销。', { okText: '删除', danger: true });
       if (!ok) return;
-      const r = await fetch('/api/plans/' + id, { method: 'DELETE' });
+      const r = await apiFetch('/api/plans/' + id, { method: 'DELETE' });
       if (!r.ok) {
         showToast('删除失败', 'err');
         return;

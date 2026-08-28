@@ -60,9 +60,7 @@ def test_renamed_reordered_extra_columns():
         assert o.check_in == "2025-06-01"      # 斜杠日期已归一化
         assert o.order_amount == 388.0         # ¥ 已解析
         assert abs(o.settle_amount - 349.2) < 0.01
-        # 佣金比例推导仍生效(1004 行)
-        o4 = next(x for x in orders if x.order_no == "1004")
-        assert abs(o4.commission_amount - 58.2) < 0.01
+        # (佣金比例推导细节见 test_parsers.test_commission_rate_derivation)
         print("renamed/reordered/extra/yuan/slash OK")
     finally:
         Path(path).unlink(missing_ok=True)

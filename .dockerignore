@@ -1,0 +1,13 @@
+.git
+.venv
+__pycache__
+*.pyc
+*.pyo
+backend/app/data
+backend/dist
+backend/build
+backend/*.spec
+docs
+templates
+.npm-tmp
+.env

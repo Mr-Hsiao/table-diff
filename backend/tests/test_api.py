@@ -200,10 +200,36 @@ def test_missing_column_error():
         Path(t2).unlink(missing_ok=True)
 
 
+def test_token_auth():
+    import os
+    os.environ["TABLE_DIFF_TOKEN"] = "secret123"
+    try:
+        with TestClient(app) as client:
+            r = client.get("/api/plans")
+            assert r.status_code == 401
+            assert "口令" in r.json()["detail"]
+            # 查询参数传口令
+            r = client.get("/api/plans?token=secret123")
+            assert r.status_code == 200
+            # 请求头传口令
+            r = client.get("/api/plans", headers={"X-Token": "secret123"})
+            assert r.status_code == 200
+            # 健康检查免口令(监控用)
+            r = client.get("/api/health")
+            assert r.status_code == 200
+            # 静态页面不拦截
+            r = client.get("/")
+            assert r.status_code == 200
+    finally:
+        os.environ.pop("TABLE_DIFF_TOKEN", None)
+    print("token auth OK")
+
+
 if __name__ == "__main__":
     test_static_page()
     test_preview_plans_recon_export()
     test_three_tables()
     test_file_count_mismatch()
     test_missing_column_error()
+    test_token_auth()
     print("\nAPI 测试全部通过 - PASS")

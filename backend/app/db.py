@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 import sys
 import uuid
@@ -15,7 +16,10 @@ from .models import MatchItem, ParsedOrder
 
 
 def _data_dir() -> Path:
-    """数据目录:开发时在 app/data;打包成 exe 后放在 exe 同目录的 data 下(可移植、可备份)。"""
+    """数据目录优先级:环境变量 TABLE_DIFF_DATA_DIR(容器挂载)> exe 同目录(打包后)> app/data(开发)。"""
+    env = os.environ.get("TABLE_DIFF_DATA_DIR", "").strip()
+    if env:
+        return Path(env)
     if getattr(sys, "frozen", False):
         return Path(sys.executable).resolve().parent / "data"
     return Path(__file__).resolve().parent / "data"
@@ -73,8 +77,14 @@ CREATE INDEX IF NOT EXISTS idx_matches_run ON matches(run_id);
 
 def _conn() -> sqlite3.Connection:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=15)
     conn.row_factory = sqlite3.Row
+    # WAL 模式 + 忙等待:服务器多人并发时减少锁冲突
+    try:
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA busy_timeout=15000")
+    except sqlite3.Error:
+        pass
     return conn
 
 

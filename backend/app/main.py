@@ -13,6 +13,7 @@ from __future__ import annotations
 import csv
 import io
 import json
+import os
 import shutil
 import sys
 import uuid
@@ -22,7 +23,7 @@ from typing import List
 
 import uvicorn
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
-from fastapi.responses import Response
+from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from . import db
@@ -51,6 +52,21 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="表对比工具", version="0.6.0", lifespan=lifespan)
+
+
+@app.middleware("http")
+async def auth_middleware(request, call_next):
+    """访问口令:设置环境变量 TABLE_DIFF_TOKEN 后启用(公网部署必配,否则任何人可操作)。
+
+    口令通过请求头 X-Token 或查询参数 token 传递;/api/health 放行便于监控。
+    """
+    token = os.environ.get("TABLE_DIFF_TOKEN", "")
+    if token and request.url.path.startswith("/api/") \
+            and not request.url.path.startswith("/api/health"):
+        got = request.headers.get("x-token") or request.query_params.get("token")
+        if got != token:
+            return JSONResponse(status_code=401, content={"detail": "需要访问口令"})
+    return await call_next(request)
 
 
 @app.get("/api/health")
@@ -297,11 +313,27 @@ app.mount("/", StaticFiles(directory=_static_dir(), html=True), name="static")
 
 
 def run_server():
-    """启动本地服务:默认 8000,被占用自动回退到备用端口(打印实际地址)。"""
-    import os
+    """启动服务。
+
+    - 本机模式(默认):绑定 127.0.0.1,端口被占用自动回退并打印实际地址
+    - 服务器模式:设置 TABLE_DIFF_HOST=0.0.0.0 后直接绑定,不做端口回退(容器/公网用)
+    """
     import socket
 
-    candidates = [int(os.environ.get("TABLE_DIFF_PORT", "8000")), 8765, 8080, 9000]
+    host = os.environ.get("TABLE_DIFF_HOST", "127.0.0.1")
+    port = int(os.environ.get("TABLE_DIFF_PORT", "8000"))
+    if host == "0.0.0.0":
+        # 服务器模式安全防线:必须设置访问口令,否则拒绝启动
+        if not os.environ.get("TABLE_DIFF_TOKEN", ""):
+            print("[错误] 服务器模式必须设置访问口令(TABLE_DIFF_TOKEN)。\n"
+                  "       生成命令: openssl rand -hex 16\n"
+                  "       这是防止公网任何人操作你的服务的必要配置。")
+            raise SystemExit(1)
+        print(f"[提示] 服务已启动 http://0.0.0.0:{port}(公网访问请配置反向代理与 HTTPS)")
+        uvicorn.run(app, host="0.0.0.0", port=port)
+        return
+
+    candidates = [port, 8765, 8080, 9000]
     chosen = None
     for p in dict.fromkeys(candidates):
         try:
@@ -312,7 +344,7 @@ def run_server():
         except OSError:
             continue
     if chosen is None:
-        print("[错误] 没有可用端口,请设置环境变量 HOTEL_RECON_PORT 指定端口")
+        print("[错误] 没有可用端口,请设置环境变量 TABLE_DIFF_PORT 指定端口")
         raise SystemExit(1)
     if chosen != candidates[0]:
         print(f"[提示] 端口 {candidates[0]} 被占用,已改用端口 {chosen}")
